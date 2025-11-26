@@ -75,5 +75,63 @@ router.get("/:id", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+// POST /api/images/sync
+router.post("/sync", async (req, res) => {
+  try {
+    const { folder, name } = req.body;
+
+    if (!folder || !name) {
+      return res.status(400).json({ error: "folder and name are required" });
+    }
+
+    // Find DB entry by NAME
+    const project = await Image.findOne({ name });
+
+    if (!project) {
+      return res.status(404).json({ error: "Project with that NAME not found" });
+    }
+
+    // Fetch Cloudinary folder images
+    const result = await cloudinary.search
+      .expression(`folder:"${folder}"`)
+      .sort_by("public_id", "asc")
+      .max_results(200)
+      .execute();
+
+    const cloudinaryMedia = result.resources.map((item) => ({
+      url: item.secure_url,
+      type: item.resource_type,
+    }));
+
+    const dbMedia = project.images;
+
+    // Add new images
+    const toAdd = cloudinaryMedia.filter(
+      (c) => !dbMedia.some((d) => d.url === c.url)
+    );
+
+    // Remove images not present in Cloudinary
+    const remaining = dbMedia.filter((d) =>
+      cloudinaryMedia.some((c) => c.url === d.url)
+    );
+
+    const updatedImages = [...remaining, ...toAdd];
+
+    project.images = updatedImages;
+    await project.save();
+
+    res.json({
+      message: "✅ Sync complete using NAME",
+      added: toAdd.length,
+      removed: dbMedia.length - remaining.length,
+      total: updatedImages.length,
+      data: project,
+    });
+  } catch (error) {
+    console.error("❌ Sync error:", error);
+    res.status(500).json({ error: "Sync failed" });
+  }
+});
+
 
 module.exports = router;
