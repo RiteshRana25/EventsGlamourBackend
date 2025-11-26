@@ -7,12 +7,17 @@ const Image = require("../models/Image");
 // POST /api/images/upload
 router.post("/upload", async (req, res) => {
   try {
-    const { name, cover, folder } = req.body;
+    const { name, cover, folder, type } = req.body; // <-- Added 'type'
+
+    // Validate required fields
+    if (!name || !cover || !folder || !type) {
+      return res.status(400).json({ error: "All fields (name, cover, folder, type) are required" });
+    }
 
     // Generate slug from name
     const id = name.trim().toLowerCase().replace(/\s+/g, "-");
 
-    // Get media from Cloudinary
+    // Fetch media from Cloudinary folder
     const result = await cloudinary.search
       .expression(`folder:"${folder}"`)
       .sort_by("public_id", "asc")
@@ -24,11 +29,14 @@ router.post("/upload", async (req, res) => {
       type: item.resource_type, // 'image' or 'video'
     }));
 
+    // Exclude the cover image from the array of images
     const filteredMedia = allMedia.filter((item) => item.url !== cover);
 
+    // Create new Image document
     const imageData = new Image({
       id,
       name,
+      type,      // <-- Save type here
       cover,
       images: filteredMedia,
     });
@@ -38,30 +46,32 @@ router.post("/upload", async (req, res) => {
     console.log("✅ Data saved to MongoDB:");
     console.log(JSON.stringify(imageData, null, 2));
 
-    res.status(201).json({ message: "✅ Folder imported and saved!" });
+    res.status(201).json({ message: "✅ Folder imported and saved!", data: imageData });
   } catch (error) {
     console.error("❌ Error uploading folder:", error);
     res.status(500).json({ error: "Something went wrong" });
   }
 });
 
-// GET all
+// GET all images
 router.get("/", async (req, res) => {
   try {
     const data = await Image.find();
     res.json(data);
   } catch (err) {
+    console.error("❌ Failed to fetch data:", err);
     res.status(500).json({ error: "Failed to fetch data" });
   }
 });
 
-// GET by id
+// GET single image folder by id
 router.get("/:id", async (req, res) => {
   try {
     const data = await Image.findOne({ id: req.params.id });
     if (!data) return res.status(404).json({ error: "Not found" });
     res.json(data);
   } catch (err) {
+    console.error("❌ Server error:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
