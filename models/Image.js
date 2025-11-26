@@ -5,6 +5,7 @@ const ImageSchema = new mongoose.Schema(
   {
     id: { type: String, required: true, unique: true },
     name: { type: String, required: true },
+    type: { type: String, required: true }, // <-- NEW FIELD
     cover: { type: String, required: true },
     images: [
       {
