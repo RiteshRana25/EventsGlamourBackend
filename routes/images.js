@@ -1,4 +1,3 @@
-// backend/routes/images.js
 const express = require("express");
 const router = express.Router();
 const cloudinary = require("../cloudinary");
@@ -29,14 +28,14 @@ router.post("/upload", async (req, res) => {
       type: item.resource_type, // 'image' or 'video'
     }));
 
-    // Exclude the cover image from the array of images
+    // Exclude the cover image from the array
     const filteredMedia = allMedia.filter((item) => item.url !== cover);
 
     // Create new Image document
     const imageData = new Image({
       id,
       name,
-      type,      // <-- Save type here
+      type,
       cover,
       images: filteredMedia,
     });
@@ -75,10 +74,11 @@ router.get("/:id", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+
 // POST /api/images/sync
 router.post("/sync", async (req, res) => {
   try {
-    const { folder, name } = req.body;
+    const { folder, name, cover } = req.body; // <-- cover added
 
     if (!folder || !name) {
       return res.status(400).json({ error: "folder and name are required" });
@@ -89,6 +89,16 @@ router.post("/sync", async (req, res) => {
 
     if (!project) {
       return res.status(404).json({ error: "Project with that NAME not found" });
+    }
+
+    // ---------------------------------------
+    // ✅ UPDATE COVER IMAGE (ONLY IF PROVIDED)
+    // ---------------------------------------
+    let coverUpdated = false;
+
+    if (cover && typeof cover === "string" && cover.trim() !== "") {
+      project.cover = cover;
+      coverUpdated = true;
     }
 
     // Fetch Cloudinary folder images
@@ -118,6 +128,7 @@ router.post("/sync", async (req, res) => {
     const updatedImages = [...remaining, ...toAdd];
 
     project.images = updatedImages;
+
     await project.save();
 
     res.json({
@@ -125,6 +136,7 @@ router.post("/sync", async (req, res) => {
       added: toAdd.length,
       removed: dbMedia.length - remaining.length,
       total: updatedImages.length,
+      coverUpdated,
       data: project,
     });
   } catch (error) {
@@ -132,6 +144,5 @@ router.post("/sync", async (req, res) => {
     res.status(500).json({ error: "Sync failed" });
   }
 });
-
 
 module.exports = router;
