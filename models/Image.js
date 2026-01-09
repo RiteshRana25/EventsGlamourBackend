@@ -1,11 +1,11 @@
-// backend/models/Image.js
+
 const mongoose = require("mongoose");
 
 const ImageSchema = new mongoose.Schema(
   {
     id: { type: String, required: true, unique: true },
     name: { type: String, required: true },
-    type: { type: String, required: true }, // <-- NEW FIELD
+    type: { type: String, required: true },
     cover: { type: String, required: true },
     images: [
       {
